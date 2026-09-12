@@ -216,8 +216,9 @@ services:
       - REKONI_URL=http${SECURE:+s}://${HOST_ADDRESS}/_rekoni
       - CALENDAR_URL=http${SECURE:+s}://${HOST_ADDRESS}/_calendar
       - GMAIL_URL=http${SECURE:+s}://${HOST_ADDRESS}/_gmail
-      # TELEGRAM_URL — интеграция личного TG-аккаунта (сервис hardcoreeng/telegram), не развёрнута.
-      # Бот-уведомления читаются фронтом из TELEGRAM_BOT_URL.
+      # TELEGRAM_URL обязателен: без него front падает с "please provide telegram url".
+      # Бот-уведомления читаются отдельно из TELEGRAM_BOT_URL.
+      - TELEGRAM_URL=http${SECURE:+s}://${HOST_ADDRESS}/_telegram
       - TELEGRAM_BOT_URL=http${SECURE:+s}://${HOST_ADDRESS}/_telegram
       - STATS_URL=http${SECURE:+s}://${HOST_ADDRESS}/_stats
       - UPLOAD_URL=/files
