@@ -6,6 +6,16 @@ services:
       - "${HTTP_BIND}:${HTTP_PORT}:80"
     volumes:
       - ./.huly.nginx:/etc/nginx/conf.d/default.conf
+    # nginx резолвит upstream'ы ядра при старте и падает, если имя не найдено,
+    # поэтому эти контейнеры должны быть созданы раньше. Опциональные интеграции
+    # сюда не добавлять — они резолвятся в рантайме через resolver в .huly.nginx.
+    depends_on:
+      - front
+      - account
+      - transactor
+      - collaborator
+      - rekoni
+      - stats
     restart: unless-stopped
     networks:
       - huly_net
