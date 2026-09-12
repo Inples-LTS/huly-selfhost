@@ -150,17 +150,6 @@ server {
         proxy_pass http://$up_telegram_bot:4020;
     }
 
-    # Подключение личного Telegram-аккаунта (MTProto).
-    location /_telegram {
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        set $up_telegram telegram;
-        rewrite ^/_telegram(/.*)$ $1 break;
-        proxy_pass http://$up_telegram:8086;
-    }
     
     #location /_github {
     #    proxy_set_header Host $host;

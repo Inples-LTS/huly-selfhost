@@ -261,23 +261,6 @@ services:
     networks:
       - huly_net
 
-  telegram:
-    image: hardcoreeng/telegram:${HULY_VERSION}
-    environment:
-      - PORT=8086
-      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
-      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
-      - MONGO_URI=mongodb://mongodb:27017
-      - ACCOUNTS_URL=http://account:3000
-      - SECRET=${SECRET}
-      - STATS_URL=http://stats:4900
-      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
-    depends_on:
-      - mongodb
-    restart: unless-stopped
-    networks:
-      - huly_net
-
   fulltext:
     image: hardcoreeng/fulltext:${HULY_VERSION}
     environment:
