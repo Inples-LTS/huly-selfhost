@@ -100,14 +100,14 @@ services:
     networks:
       - huly_net
 
-  # mongodb:
-  #   image: mongo:7-jammy
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ${VOLUME_MONGO_PATH:-mongodb}:/data/db
-  #   networks:
-  #     - huly_net
-  #   # Required by aibot and calendar services
+  mongodb:
+    image: mongo:7-jammy
+    restart: unless-stopped
+    volumes:
+      - ${VOLUME_MONGO_PATH:-mongodb}:/data/db
+    networks:
+      - huly_net
+    # Required by aibot and calendar services, plus the telegram account integration
 
   # redis:
   #   image: redis:7-alpine
@@ -226,10 +226,11 @@ services:
       - REKONI_URL=http${SECURE:+s}://${HOST_ADDRESS}/_rekoni
       - CALENDAR_URL=http${SECURE:+s}://${HOST_ADDRESS}/_calendar
       - GMAIL_URL=http${SECURE:+s}://${HOST_ADDRESS}/_gmail
+      # Две разные интеграции на разных адресах: TELEGRAM_URL — подключение личного
+      # аккаунта (сервис telegram), TELEGRAM_BOT_URL — уведомления (telegram-bot).
       # TELEGRAM_URL обязателен: без него front падает с "please provide telegram url".
-      # Бот-уведомления читаются отдельно из TELEGRAM_BOT_URL.
       - TELEGRAM_URL=http${SECURE:+s}://${HOST_ADDRESS}/_telegram
-      - TELEGRAM_BOT_URL=http${SECURE:+s}://${HOST_ADDRESS}/_telegram
+      - TELEGRAM_BOT_URL=http${SECURE:+s}://${HOST_ADDRESS}/_telegram-bot
       - STATS_URL=http${SECURE:+s}://${HOST_ADDRESS}/_stats
       - UPLOAD_URL=/files
       - ELASTIC_URL=http://elastic:9200
@@ -256,6 +257,23 @@ services:
       - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
       - QUEUE_CONFIG=redpanda:9092
       - QUEUE_REGION=
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  telegram:
+    image: hardcoreeng/telegram:${HULY_VERSION}
+    environment:
+      - PORT=8086
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - MONGO_URI=mongodb://mongodb:27017
+      - ACCOUNTS_URL=http://account:3000
+      - SECRET=${SECRET}
+      - STATS_URL=http://stats:4900
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+    depends_on:
+      - mongodb
     restart: unless-stopped
     networks:
       - huly_net
