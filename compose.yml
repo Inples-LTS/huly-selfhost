@@ -275,11 +275,17 @@ services:
       - APP_ID=${GITHUB_APPID}
       - CLIENT_ID=${GITHUB_CLIENTID}
       - CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - PRIVATE_KEY=${GITHUB_PRIVATE_KEY}
       - COLLABORATOR_URL=ws${SECURE:+s}://${HOST_ADDRESS}/_collaborator
       - WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
       - FRONT_URL=http${SECURE:+s}://${HOST_ADDRESS}
       - BOT_NAME=${GITHUB_APP_SLUG}[bot]
+    # PRIVATE_KEY подаётся отдельным файлом: это многострочный PEM, а панель
+    # Dokploy срезает кавычки в .env, из-за чего строки ключа превращаются
+    # в «переменные» и docker compose отказывается читать файл целиком.
+    # Ключ с литеральными \n не подходит — crypto.createPrivateKey его не парсит.
+    # Файл лежит на хосте вне git и вне Dokploy: /etc/huly-secrets/github.env (0600).
+    env_file:
+      - /etc/huly-secrets/github.env
     restart: unless-stopped
     networks:
       - huly_net
