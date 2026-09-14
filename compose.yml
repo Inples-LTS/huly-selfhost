@@ -330,7 +330,9 @@ services:
     environment:
       # Формат "имя_ключа: секрет"; имя обязано совпадать с webhook.api_key
       # в .livekit.yaml.
-      - LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+      # Кавычки обязательны: без них ": " делает из строки словарь и
+      # docker compose падает на "unexpected type map".
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
     ports:
       - "7880:7880"
       - "7881:7881"
