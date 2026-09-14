@@ -341,6 +341,46 @@ services:
     networks:
       - huly_net
 
+  # Redis нужен не сам по себе: через него livekit-server и egress находят
+  # друг друга (psrpc). Без него startTrackEgress уходит в никуда, а
+  # listEgress отвечает Internal service panic.
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  livekit-egress:
+    image: livekit/egress:v1.9.1
+    environment:
+      # Конфиг подаётся телом в одну строку: панель Dokploy портит
+      # многострочные значения в .env — на этом уже обожглись с приватным
+      # ключом GitHub App.
+      - EGRESS_CONFIG_BODY=${EGRESS_CONFIG_BODY}
+    # Нужен для песочницы headless Chrome. Мы снимаем только отдельные
+    # аудиодорожки (TrackEgress), браузер при этом не поднимается, но образ
+    # проверяет доступность капабилити на старте.
+    cap_add:
+      - SYS_ADMIN
+    deploy:
+      resources:
+        limits:
+          # На хосте свободно около 5.5 ГБ, и рядом живёт боевой Huly.
+          # Предел выставлен намеренно: на granai.ru сборка без лимита
+          # положила весь хост по OOM.
+          memory: 2G
+    depends_on:
+      - redis
+      - livekit
+    restart: unless-stopped
+    networks:
+      - huly_net
+
   love:
     image: hardcoreeng/love:${HULY_VERSION}
     environment:

@@ -24,6 +24,11 @@ room:
   auto_create: true
   empty_timeout: 300
 
+# Общий с egress. Через Redis livekit-server видит egress-воркер; без этого
+# блока запись дорожек не работает, а listEgress паникует.
+redis:
+  address: redis:6379
+
 webhook:
   # Ключ из LIVEKIT_KEYS, которым подписываются вебхуки.
   api_key: huly
