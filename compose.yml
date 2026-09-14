@@ -221,6 +221,8 @@ services:
       - SERVER_PORT=8080
       - SERVER_SECRET=${SECRET}
       - LOVE_ENDPOINT=http${SECURE:+s}://${HOST_ADDRESS}/_love
+      # Без LIVEKIT_WS front отдаёт пустую строку и звонок не поднимается.
+      - LIVEKIT_WS=${LIVEKIT_WS}
       - ACCOUNTS_URL=http${SECURE:+s}://${HOST_ADDRESS}/_accounts
       - ACCOUNTS_URL_INTERNAL=http://account:3000
       - REKONI_URL=http${SECURE:+s}://${HOST_ADDRESS}/_rekoni
@@ -311,6 +313,52 @@ services:
     environment:
       - PORT=4900
       - SERVER_SECRET=${SECRET}
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  # --- Видеозвонки: LiveKit (медиа) + love (токены, вебхуки, запись) ---------
+  #
+  # Сигнальный WebSocket приходит на livekit.inples.ru через traefik, медиа идёт
+  # напрямую на хост: UDP 7882 (мультиплекс) и TCP 7881 (fallback для клиентов
+  # за жёстким NAT). Диапазон UDP-портов сознательно не публикуем.
+  livekit:
+    image: livekit/livekit-server:v1.8.4
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./.livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      # Формат "имя_ключа: секрет"; имя обязано совпадать с webhook.api_key
+      # в .livekit.yaml.
+      - LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  love:
+    image: hardcoreeng/love:${HULY_VERSION}
+    environment:
+      - PORT=8096
+      - SECRET=${SECRET}
+      - SERVICE_ID=love-service
+      - ACCOUNTS_URL=http://account:3000
+      - STATS_URL=http://stats:4900
+      - LIVEKIT_HOST=http://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      # Запись комнаты силами love намеренно не включена: она умеет только
+      # room-composite MP4 720p/1080p, а нам для расшифровки нужен звук.
+      # При kind=minio checkRecordAvailable отдаёт false и кнопка записи
+      # в интерфейсе не появляется. Аудиозапись делает отдельный сервис.
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - STORAGE_PROVIDER_NAME=minio
+    depends_on:
+      - livekit
+      - account
     restart: unless-stopped
     networks:
       - huly_net
