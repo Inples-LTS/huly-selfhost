@@ -383,6 +383,54 @@ services:
     networks:
       - huly_net
 
+  # Расшифровка созвонов: пишет аудиодорожки участников через LiveKit Egress,
+  # отправляет в Gemini и возвращает итог в Huly. Репозиторий сервиса —
+  # Inples-LTS/huly-meetscribe, образ собирается в GitHub Actions и приезжает
+  # из GHCR: на этом хосте рядом живёт боевой Huly, собирать здесь нельзя.
+  meetscribe:
+    image: ghcr.io/inples-lts/huly-meetscribe:latest
+    environment:
+      - PORT=4030
+      - LIVEKIT_URL=http://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      # Endpoint обязательно с портом: love теряет его в этом самом месте,
+      # и его запись поэтому не работает с нашим MinIO.
+      - S3_ENDPOINT=http://minio:9000
+      # Отдельный пользователь с политикой только на свой бакет. minioadmin —
+      # суперпользователь всего хранилища, включая файлы Huly.
+      - S3_ACCESS_KEY=${MEETSCRIBE_S3_KEY}
+      - S3_SECRET_KEY=${MEETSCRIBE_S3_SECRET}
+      - S3_BUCKET=meetscribe
+      - HULY_URL=http${SECURE:+s}://${HOST_ADDRESS}
+      - HULY_TOKEN=${MEETSCRIBE_HULY_TOKEN}
+      - HULY_WORKSPACE_URL=${MEETSCRIBE_WORKSPACE}
+      - HULY_TEAMSPACE=${MEETSCRIBE_TEAMSPACE}
+      - HULY_PROJECT=${MEETSCRIBE_PROJECT}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${MEETSCRIBE_TG_CHAT}
+      - STATE_DB=/state/meetscribe.db
+    # Ключ Gemini не в git и не в панели: панель срезает кавычки, а ключ нужен
+    # целиком. Тот же приём, что с приватным ключом GitHub App и конфигом
+    # egress. Файл не воспроизводится из репозитория — при переносе VPS
+    # создать заново.
+    env_file:
+      - /etc/huly-secrets/gemini.env
+    volumes:
+      # Состояние встреч в SQLite. Без постоянного тома перезапуск посреди
+      # встречи тихо теряет весь её итог.
+      - meetscribe_state:/state
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    depends_on:
+      - livekit
+      - livekit-egress
+    restart: unless-stopped
+    networks:
+      - huly_net
+
   love:
     image: hardcoreeng/love:${HULY_VERSION}
     environment:
@@ -422,6 +470,7 @@ services:
       - huly_net
       
 volumes:
+  meetscribe_state:
   # These named volumes are used when custom volume paths are not specified
   # If VOLUME_*_PATH variables are set, these volumes will be ignored
   elastic:
