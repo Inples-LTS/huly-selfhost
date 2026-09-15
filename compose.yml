@@ -414,12 +414,18 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${MEETSCRIBE_TG_CHAT}
       - STATE_DB=/state/meetscribe.db
-    # Ключ Gemini не в git и не в панели: панель срезает кавычки, а ключ нужен
-    # целиком. Тот же приём, что с приватным ключом GitHub App и конфигом
-    # egress. Файл не воспроизводится из репозитория — при переносе VPS
-    # создать заново.
+      # Модель вызывается через собственный шлюз LiteLLM по приватной сети
+      # WireGuard, а не напрямую: Gemini API отвечает этому хосту
+      # "User location is not supported for the API use" — Google блокирует
+      # запросы по географии сервера. Шлюз уводит их через purchase-gw
+      # за пределы РФ и заодно считает расход.
+      - LLM_BASE_URL=http://10.10.0.2:4000
+      - LLM_MODEL=gemini-3-flash
+    # Виртуальный ключ шлюза лежит файлом на хосте, вне git и вне панели —
+    # тот же приём, что с приватным ключом GitHub App и конфигом egress.
+    # Файл не воспроизводится из репозитория: при переносе VPS создать заново.
     env_file:
-      - /etc/huly-secrets/gemini.env
+      - /etc/huly-secrets/llm.env
     volumes:
       # Состояние встреч в SQLite. Без постоянного тома перезапуск посреди
       # встречи тихо теряет весь её итог.
