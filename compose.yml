@@ -389,6 +389,10 @@ services:
   # из GHCR: на этом хосте рядом живёт боевой Huly, собирать здесь нельзя.
   meetscribe:
     image: ghcr.io/inples-lts/huly-meetscribe:latest
+    # Без этого docker compose up -d не перекачивает изменившийся тег latest:
+    # контейнер молча продолжает работать на старом образе, и выкатка правки
+    # выглядит успешной, ничего не изменив.
+    pull_policy: always
     environment:
       - PORT=4030
       - LIVEKIT_URL=http://livekit:7880
