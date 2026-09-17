@@ -234,6 +234,9 @@ services:
       - TELEGRAM_URL=http${SECURE:+s}://${HOST_ADDRESS}/_telegram
       - TELEGRAM_BOT_URL=http${SECURE:+s}://${HOST_ADDRESS}/_telegram-bot
       - GITHUB_URL=http${SECURE:+s}://${HOST_ADDRESS}/_github
+      # Адрес ai-bot. Без него в комнате не появляется кнопка расшифровки:
+      # фронт считает, что ИИ-сервиса в инсталляции нет.
+      - AI_URL=http${SECURE:+s}://${HOST_ADDRESS}/_aibot
       - GITHUB_APP=${GITHUB_APP_SLUG}
       - GITHUB_CLIENTID=${GITHUB_CLIENTID}
       - STATS_URL=http${SECURE:+s}://${HOST_ADDRESS}/_stats
@@ -436,6 +439,80 @@ services:
     depends_on:
       - livekit
       - livekit-egress
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  # --- Живая расшифровка созвонов --------------------------------------------
+  #
+  # ai-bot заводит себе учётную запись в воркспейсе (huly.ai.bot@hc.engineering),
+  # принимает реплики от агента и пишет их в карточку встречи по ходу звонка.
+  # Мongo ему нужен под собственное хранилище — ядро Huly живёт на CockroachDB
+  # и Mongo не использует.
+  aibot:
+    image: hardcoreeng/ai-bot:${HULY_VERSION}
+    environment:
+      - PORT=4010
+      - SERVER_SECRET=${SECRET}
+      - SERVICE_ID=ai-bot-service
+      - ACCOUNTS_URL=http://account:3000
+      - STATS_URL=http://stats:4900
+      - DB_URL=${CR_DB_URL}
+      - MONGO_URL=mongodb://mongodb:27017
+      - QUEUE_CONFIG=redpanda:9092
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - LOVE_ENDPOINT=http://love:8096
+      - FIRST_NAME=${AIBOT_FIRST_NAME:-Huly}
+      - LAST_NAME=${AIBOT_LAST_NAME:-AI}
+      - PASSWORD=${AIBOT_PASSWORD}
+      # Саммари и перевод идут через тот же шлюз LiteLLM, что и meetscribe:
+      # OpenAI-совместимый API, за ним Gemini. Прямого ключа OpenAI у нас нет.
+      - OPENAI_API_KEY=${AIBOT_LLM_KEY}
+      - OPENAI_BASE_URL=http://10.10.0.2:4000/v1
+      - OPENAI_MODEL=${AIBOT_LLM_MODEL:-gemini-3-flash}
+      - OPENAI_TRANSLATE_MODEL=${AIBOT_LLM_MODEL:-gemini-3-flash}
+      - OPENAI_SUMMARY_MODEL=${AIBOT_LLM_MODEL:-gemini-3-flash}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      - account
+      - mongodb
+      - love
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  # Агент LiveKit: подключается к комнате отдельным участником, слушает дорожки
+  # и стримит звук в Deepgram, реплики отдаёт в ai-bot. Адрес Deepgram зашит в
+  # образе, через шлюз LiteLLM его не увести — поэтому ключ отдельный.
+  # PLATFORM_TOKEN — токен учётной записи самого ai-bot: сервис сверяет его с
+  # своим account uuid и на чужом токене отвечает 401.
+  love-agent:
+    image: hardcoreeng/love-agent:${HULY_VERSION}
+    environment:
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - PLATFORM_URL=http://aibot:4010
+      - PLATFORM_TOKEN=${LOVE_AGENT_TOKEN}
+      - STT_PROVIDER=deepgram
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      # nova-3 с language=multi — единственная связка, которая слышит русский
+      # вперемешку с английским; агент выставляет multi сам.
+      - DEEPGRAM_MODEL=${DEEPGRAM_MODEL:-nova-3}
+      - DG_PUNCTUATE=true
+      - DG_SMART_FORMAT=true
+      - DG_ENDPOINTING=300
+      - DG_UTTERANCE_END_MS=1000
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      - livekit
+      - aibot
     restart: unless-stopped
     networks:
       - huly_net
