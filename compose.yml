@@ -505,7 +505,10 @@ services:
       - DG_PUNCTUATE=true
       - DG_SMART_FORMAT=true
       - DG_ENDPOINTING=300
-      - DG_UTTERANCE_END_MS=1000
+      # utterance_end_ms Deepgram принимает только вместе с interim_results, иначе
+      # рвёт рукопожатие с 400 ещё до первого кадра звука, а агент падает на
+      # необработанной ошибке сокета и уносит с собой всю встречу.
+      - DG_UTTERANCE_END_MS=0
     deploy:
       resources:
         limits:
