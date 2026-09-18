@@ -165,6 +165,8 @@ services:
       - STATS_URL=http://stats:4900
       - LAST_NAME_FIRST=${LAST_NAME_FIRST:-true}
       - QUEUE_CONFIG=redpanda:9092
+      - MAIL_URL=http://mail:8097
+      - MAIL_AUTH_TOKEN=${MAIL_AUTH_TOKEN}
     restart: unless-stopped
     networks:
       - huly_net
@@ -177,6 +179,29 @@ services:
       - ACCOUNTS_URL=http://account:3000
       - STATS_URL=http://stats:4900
       - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  # Исходящие письма: приглашения в workspace, сброс пароля, уведомления.
+  # Шлюз на nodemailer, наружу не торчит — account и transactor ходят в него
+  # по huly_net. API_KEY здесь и MAIL_AUTH_TOKEN у клиентов должны совпадать:
+  # ключ уезжает в теле запроса полем apiKey, несовпадение даёт 401.
+  # PORT обязателен, дефолта у сервиса нет — без него контейнер падает на старте.
+  mail:
+    image: hardcoreeng/mail:${HULY_VERSION}
+    environment:
+      - PORT=8097
+      - SOURCE=${SMTP_SOURCE}
+      - REPLY_TO=${SMTP_REPLY_TO:-}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      # secure — TLS сразу (465), upgrade — STARTTLS (587), ignore — без шифрования
+      - SMTP_TLS_MODE=${SMTP_TLS_MODE:-upgrade}
+      - API_KEY=${MAIL_AUTH_TOKEN}
+      - STATS_URL=http://stats:4900
     restart: unless-stopped
     networks:
       - huly_net
@@ -195,6 +220,8 @@ services:
       - ACCOUNTS_URL=http${SECURE:+s}://${HOST_ADDRESS}/_accounts
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=redpanda:9092
+      - MAIL_URL=http://mail:8097
+      - MAIL_AUTH_TOKEN=${MAIL_AUTH_TOKEN}
     restart: unless-stopped
     networks:
       - huly_net
@@ -212,6 +239,8 @@ services:
       - QUEUE_CONFIG=redpanda:9092
       - ACCOUNTS_DB_URL=${CR_DB_URL}
     # - INIT_REPO_DIR=/no-init-scripts
+      - MAIL_URL=http://mail:8097
+      - MAIL_AUTH_TOKEN=${MAIL_AUTH_TOKEN}
     restart: unless-stopped
     networks:
       - huly_net
